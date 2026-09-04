@@ -1,0 +1,80 @@
+services:
+  postgres:
+    container_name: ms_postgresql
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  pgadmin:
+    container_name: ms_pgadmin
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - 5000:80
+    networks:
+      - ms-net
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  mongodb:
+    container_name: ms_mongo
+    image: mongo:7
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  mongo-express:
+    container_name: ms_mongo_express
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USER}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD}
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+    networks:
+      - ms-net
+    depends_on:
+      - mongodb
+
+  maildev:
+    image: maildev/maildev
+    container_name: ms_mail_dev
+    ports:
+      - 1080:1080
+      - 1025:1025
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+networks:
+  ms-net:
+    driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:
+  mongodb:
