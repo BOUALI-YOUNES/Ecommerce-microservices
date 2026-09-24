@@ -17,14 +17,19 @@ spring:
             - id: customer-service
               uri: lb://customer-service
               predicates:
-                - Path=/customers/**
+                - Path=/api/v1/customers/**
 
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/order/**
+                - Path=/api/v1/orders/**
+
+            - id: payment-service
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/v1/payment/**
 
 eureka:
   client:
     service-url:
-          defaultZone: http://discovery-server:8761/eureka
+          defaultZone: http://${EUREKA_HOST:discovery-server}:8761/eureka

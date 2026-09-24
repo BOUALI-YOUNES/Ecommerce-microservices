@@ -2,4 +2,4 @@ spring:
     application:
         name: order-service
     config:
-        import: optional:configserver:http://config-server:8888
+        import: optional:configserver:http://${CONFIG_HOST:config-server}:8888

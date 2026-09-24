@@ -1,5 +1,7 @@
 package com.younes.payment.payement;
 
+import org.springframework.stereotype.Service;
+
 import com.younes.payment.notification.NotificationProducer;
 import com.younes.payment.notification.PaymentNotificationRequest;
 
@@ -8,7 +10,8 @@ import lombok.RequiredArgsConstructor;
 /**
  * PaymentService
  */
-@RequiredArgsConstructor 
+@RequiredArgsConstructor
+@Service
 public class PaymentService {
     private final PaymentRepo paymentRepo;
     private final PaymentMapper paymentMapper;

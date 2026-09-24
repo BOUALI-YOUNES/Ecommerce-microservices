@@ -8,6 +8,12 @@ services:
       - ms-net
     ports:
       - 8888:8888
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api-gateway/default"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   discovery-server:
@@ -20,7 +26,14 @@ services:
     ports:
       - 8761:8761
     depends_on:
-      - config-server
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/eureka/apps"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
     
 
@@ -134,8 +147,10 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - discovery-server
-      - config-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
     networks:
       - ms-net
     restart: unless-stopped
