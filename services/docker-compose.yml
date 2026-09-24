@@ -1,4 +1,29 @@
 services:
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: dockerfile
+    container_name: "ms_config-server"
+    networks:
+      - ms-net
+    ports:
+      - 8888:8888
+    restart: unless-stopped
+
+  discovery-server:
+    build:
+      context: ./discovery
+      dockerfile: dockerfile
+    container_name: "discovery-server"
+    networks:
+      - ms-net
+    ports:
+      - 8761:8761
+    depends_on:
+      - config-server
+    restart: unless-stopped
+    
+
   postgres:
     container_name: ms_postgresql
     image: postgres:16
@@ -66,6 +91,51 @@ services:
     ports:
       - 1080:1080
       - 1025:1025
+    networks:
+      - ms-net
+    restart: unless-stopped
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: ms_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - ms-net
+  
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: ms_kafka
+    ports:
+      - 9092:9092
+    depends_on: 
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: dockerfile
+    container_name: ms_api_gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-server
+      - config-server
     networks:
       - ms-net
     restart: unless-stopped

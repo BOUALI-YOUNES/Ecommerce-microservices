@@ -1,0 +1,18 @@
+spring:
+  kafka:
+        producer:
+            boostrap-servers: localhost:9092
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+            proprties:
+                spring.json.type.mapping: orderConfirmation:com.younes.payment.notification.PaymentNotificationRequest
+        datasource:
+              url: jdbc:postgresql://localhost:5432/payment
+              username: ${POSTGRES_USER}
+              password: ${POSTGRES_PASSWORD}
+              driver-class-name: org.postgresql.Driver
+        jpa:
+            hibernate:
+                ddl-auto: validate
+            database: postgresql
+            database-platform: org.hibernate.dialect.PostgreSQLDialect

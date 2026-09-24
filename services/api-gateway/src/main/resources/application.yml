@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+spring:
+  config:
+    import: configserver:http://config-server:8888
+  application:
+    name: api-gateway
+  

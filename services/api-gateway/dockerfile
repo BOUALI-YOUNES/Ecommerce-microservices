@@ -1,0 +1,23 @@
+# ---- Build stage ----
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /app
+
+# Copy wrapper + pom first (better layer caching — deps only re-download if pom.xml changes)
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN chmod +x mvnw
+RUN ./mvnw dependency:go-offline -B
+
+# Now copy the rest of the source and build
+COPY src src
+RUN ./mvnw clean package -DskipTests -B
+
+# ---- Run stage ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+# Copy only the built jar from the build stage — final image stays small
+COPY --from=build /app/target/*.jar app.jar
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

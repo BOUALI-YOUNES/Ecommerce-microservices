@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: product-service
+              uri: lb://product-service
+              predicates:
+                - Path=/api/v1/products/**
+
+            - id: customer-service
+              uri: lb://customer-service
+              predicates:
+                - Path=/customers/**
+
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                - Path=/order/**
+
+eureka:
+  client:
+    service-url:
+          defaultZone: http://discovery-server:8761/eureka
