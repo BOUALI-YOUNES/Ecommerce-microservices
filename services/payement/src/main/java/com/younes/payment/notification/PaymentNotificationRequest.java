@@ -14,10 +14,10 @@ import lombok.Getter;
 @Getter 
 public class PaymentNotificationRequest {
 
-    private String orderReference;
+    private String productReference;
     private BigDecimal amount;
-    private PaymentMethode paymentMethode;
-    private String customerFirstName;
-    private String customerlastName;
+    private PaymentMethode paymentMethod;
+    private String customerFirstname;
+    private String customerLastname;
     private String customerEmail;
 }

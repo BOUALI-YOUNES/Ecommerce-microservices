@@ -1,6 +1,6 @@
 spring:
     datasource:
-        url: jdbc:postgresql://localhost:5432/order
+        url: jdbc:postgresql://${DB_HOST:localhost}:5432/order
         username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
         driver-class-name: org.postgresql.Driver
@@ -11,7 +11,7 @@ spring:
         database-platform: org.hibernate.dialect.PostgreSQLDialect
     kafka:
         producer:
-            bootstrap-servers: localhost:9092
+            bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
             value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
             properties:
@@ -20,6 +20,6 @@ server:
     port: 8070
 application:
     config:
-        customer-url: http://localhost:8080/api/v1/customers
-        product-url: http://localhost:8080/api/v1/products
-        payment-url: http://localhost:8080/api/v1/payment 
+        customer-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/customers
+        product-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/products/purchase
+        payment-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/payment 

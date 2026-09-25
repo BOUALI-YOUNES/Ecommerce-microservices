@@ -47,9 +47,15 @@ services:
     volumes:
       - postgres:/var/lib/postgresql/data
     ports:
-      - 5432:5432
+      - 5433:5432
     networks:
       - ms-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
   pgadmin:
@@ -81,6 +87,12 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     networks:
       - ms-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
   mongo-express:
@@ -109,7 +121,7 @@ services:
     restart: unless-stopped
   
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.7.1
     container_name: ms_zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -118,9 +130,9 @@ services:
       - "2181:2181"
     networks:
       - ms-net
-  
+
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.7.1
     container_name: ms_kafka
     ports:
       - 9092:9092
@@ -137,6 +149,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - ms-net
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
     restart: unless-stopped
 
   api-gateway:
@@ -150,6 +168,137 @@ services:
       config-server:
         condition: service_healthy
       discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  customer-service:
+    build:
+      context: ./customer
+      dockerfile: dockerfile
+    container_name: ms_customer
+    ports:
+      - "8090:8090"
+    environment:
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - DB_HOST=mongodb
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  product-service:
+    build:
+      context: ./product
+      dockerfile: dockerfile
+    container_name: ms_product
+    ports:
+      - "8050:8050"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ./order
+      dockerfile: dockerfile
+    container_name: ms_order
+    ports:
+      - "8070:8070"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+      - KAFKA_BOOTSTRAP=kafka:29092
+      - GATEWAY_HOST=api-gateway
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ./payement
+      dockerfile: dockerfile
+    container_name: ms_payment
+    ports:
+      - "8055:8055"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+      - KAFKA_BOOTSTRAP=kafka:29092
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - ms-net
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./notification
+      dockerfile: dockerfile
+    container_name: ms_notification
+    ports:
+      - "8040:8040"
+    environment:
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - DB_HOST=mongodb
+      - KAFKA_BOOTSTRAP=kafka:29092
+      - MAIL_HOST=maildev
+      - MAIL_USER=
+      - MAIL_PASSWORD=
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - ms-net

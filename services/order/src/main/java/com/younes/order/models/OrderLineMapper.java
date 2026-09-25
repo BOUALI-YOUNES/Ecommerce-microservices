@@ -1,8 +1,11 @@
 package com.younes.order.models;
 
+import org.springframework.stereotype.Component;
+
 /**
  * OrderLineMapper
  */
+@Component
 public class OrderLineMapper {
 
     public OrderLine toOrderLine(OrderLineRequest orderLineRequest) {

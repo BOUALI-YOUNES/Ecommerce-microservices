@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j 
 public class OrderProducer {
 
-    private final KafkaTemplate<String , OrderConfirmation> kafkaTemplate;
+    private final KafkaTemplate<?, ?> kafkaTemplate;
 
     public void sendOrderConfirmation(OrderConfirmation orderConfirmation) {
         log.info("sending order confirmation");

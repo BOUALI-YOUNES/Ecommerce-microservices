@@ -8,17 +8,23 @@ import com.younes.order.models.PurchaseResponse;
 import com.younes.order.models.customer.CustomerResponse;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * OrderConfirmation
  */
-@AllArgsConstructor 
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
 public class OrderConfirmation {
 
     String orderReference;
-    BigDecimal totalAmount;
-    PaymentMethod payementMethode;
-    CustomerResponse customerResponse;
+    BigDecimal totaleAmount;
+    PaymentMethod paymentMethod;
+    CustomerResponse customer;
     List<PurchaseResponse> products;
 
 }

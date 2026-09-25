@@ -22,7 +22,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class  Notification {
     
     @Id
-    private Integer id;
+    private String id;
     private NotificationType notificationType;
     private LocalDateTime notificDateTime;
     private OrderConfirmation orderConfirmation;

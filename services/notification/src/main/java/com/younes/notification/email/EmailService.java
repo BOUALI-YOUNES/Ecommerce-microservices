@@ -32,7 +32,7 @@ public class EmailService {
     public void sendPaymentSuccessEmail(String to , String customerName , BigDecimal amount , String orderReference) throws MessagingException{
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage , MimeMessageHelper.MULTIPART_MODE_RELATED , StandardCharsets.UTF_8.name());
-        messageHelper.setFrom("noreply@my_ecom_app.com");
+        messageHelper.setFrom("noreply@my-ecom-app.com");
         final String templeteName = EmailTemplate.PAYMENT_CONFIRMATION.getTemplate();
         Map<String , Object> variables = new HashMap<>();
         variables.put("customerName", customerName);
@@ -58,7 +58,7 @@ public class EmailService {
     public void sendOrderConfirmationEmail(String to , String customerName , BigDecimal amount , String orderReference , List<Product> products) throws MessagingException{
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage , MimeMessageHelper.MULTIPART_MODE_RELATED , StandardCharsets.UTF_8.name());
-        messageHelper.setFrom("myemail.com");
+        messageHelper.setFrom("noreply@my-ecom-app.com");
         final String templeteName = EmailTemplate.ORDER_CONFIRMATION.getTemplate();
         Map<String , Object> variables = new HashMap<>();
         variables.put("customerName", customerName);
