@@ -11,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.younes.order.exception.BussenisException;
+import com.younes.order.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +33,7 @@ public class ProductClient {
         ParameterizedTypeReference<List<PurchaseResponse>> responseType = new ParameterizedTypeReference<>(){};
         ResponseEntity<List<PurchaseResponse>> responseEntity = restTemplate.exchange(productUrl, HttpMethod.POST , requestEntity , responseType);
         if(responseEntity.getStatusCode().isError()) {
-            throw new BussenisException("An error occured while processing the products purchases : " + responseEntity.getStatusCode());
+            throw new BusinessException("An error occured while processing the products purchases : " + responseEntity.getStatusCode());
         }
         return responseEntity.getBody( );
     } 

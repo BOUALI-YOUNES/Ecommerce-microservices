@@ -8,13 +8,15 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import com.younes.order.exception.BussenisException;
+import com.younes.order.exception.BusinessException;
 import com.younes.order.kafka.OrderConfirmation;
 import com.younes.order.kafka.OrderProducer;
 import com.younes.order.models.customer.CustomerClient;
+import com.younes.order.models.customer.CustomerResponse;
 import com.younes.order.payment.PaymentClient;
 import com.younes.order.payment.PaymentRequest;
 
+import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
@@ -31,9 +33,14 @@ public class OrderService {
     private final PaymentClient paymentClient;
 
     public Integer createOrder(OrderRequest orderRequest) {
-       //check if the customer exists using OpenFeign
-       var customer = this.customerClient.findCustomerById(orderRequest.getCustomerId())
-                                    .orElseThrow(() -> new BussenisException("Order cannot be created :: No customer with ID :: " + orderRequest.getCustomerId()));
+//check if the customer exists using OpenFeign
+        CustomerResponse customer;
+        try {
+            customer = this.customerClient.findCustomerById(orderRequest.getCustomerId())
+                                        .orElseThrow(() -> new BusinessException("Order cannot be created :: No customer with ID :: " + orderRequest.getCustomerId()));
+        } catch (FeignException.NotFound e) {
+            throw new BusinessException("Order cannot be created :: No customer with ID :: " + orderRequest.getCustomerId());
+        }
 
         //purchase the products
         var purchasedProducts = this.productClient.purchaseProduct(orderRequest.getProducts());
