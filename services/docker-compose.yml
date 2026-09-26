@@ -119,6 +119,14 @@ services:
     networks:
       - ms-net
     restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: ms_zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - ms-net
   
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.1

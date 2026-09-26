@@ -1,4 +1,6 @@
 eureka:
+  instance:
+    prefer-ip-address: true
   client:
     service-url:
       defaultZone: http://${EUREKA_HOST:discovery-server}:8761/eureka/
@@ -6,3 +8,13 @@ spring:
   cloud:
     config:
       override-system-properties: false
+feign:
+  micrometer:
+    enabled: true
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      zipkin:
+        endpoint: http://zipkin:9411/api/v2/spans
