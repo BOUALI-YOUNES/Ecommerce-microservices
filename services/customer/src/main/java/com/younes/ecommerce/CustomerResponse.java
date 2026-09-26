@@ -16,8 +16,8 @@ import lombok.Setter;
 @NoArgsConstructor
 public class CustomerResponse {
      private String id;
-    private String first_name;
-    private String last_name;
+    private String firstname;
+    private String lastname;
     private String email;
     private Address address;
 

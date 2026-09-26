@@ -22,8 +22,8 @@ public class Customer {
 
     @Id
     private String id;
-    private String first_name;
-    private String last_name;
+    private String firstname;
+    private String lastname;
     @Email (message = "The email is not correctlly formated !")
     @NotNull (message = "The email is required!")
     private String email;

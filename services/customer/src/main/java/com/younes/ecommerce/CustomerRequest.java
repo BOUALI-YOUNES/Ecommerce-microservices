@@ -18,9 +18,9 @@ import lombok.Setter;
 public class CustomerRequest {
     private String id;
     @NotBlank(message = "customer first name is required !")
-    private String first_name;
+    private String firstname;
     @NotBlank(message = "customer last name is required !")
-    private String last_name;
+    private String lastname;
     @Email(message = "customer email is not valid  !")
     private String email;
     private Address address;

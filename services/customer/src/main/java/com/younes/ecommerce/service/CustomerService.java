@@ -40,11 +40,11 @@ public class CustomerService {
     }
      
     private void mergeCustomer(Customer customer, CustomerRequest request) {
-        if(StringUtils.isNotBlank(request.getFirst_name())) {
-            customer.setFirst_name(request.getFirst_name());
+        if(StringUtils.isNotBlank(request.getFirstname())) {
+            customer.setFirstname(request.getFirstname());
         }
-        if(StringUtils.isNotBlank(request.getLast_name())) {
-            customer.setLast_name(request.getLast_name());
+        if(StringUtils.isNotBlank(request.getLastname())) {
+            customer.setLastname(request.getLastname());
         }
         if(StringUtils.isNotBlank(request.getEmail())) {
             customer.setEmail(request.getEmail());
@@ -61,7 +61,7 @@ public class CustomerService {
     }
 
     private CustomerResponse fromCustomer(Customer customer) {
-        return new CustomerResponse(customer.getId(),customer.getFirst_name(), customer.getLast_name(), customer.getEmail(), customer.getAddress());
+        return new CustomerResponse(customer.getId(),customer.getFirstname(), customer.getLastname(), customer.getEmail(), customer.getAddress());
     }
 
     public Boolean existsById(String customerId) {
