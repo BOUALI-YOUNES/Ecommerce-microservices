@@ -1,7 +1,14 @@
 server:
   port: 8080
 
+
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # jwk-set-uri: http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs
+          issuer-uri: http://keycloak:8080/realms/ecom-realm
   application:
     name: api-gateway
   cloud:
@@ -33,3 +40,8 @@ eureka:
   client:
     service-url:
           defaultZone: http://${EUREKA_HOST:discovery-server}:8761/eureka
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

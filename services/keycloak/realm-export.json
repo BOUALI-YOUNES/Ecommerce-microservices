@@ -1,0 +1,90 @@
+{
+  "realm": "ecom-realm",
+  "enabled": true,
+  "displayName": "Ecom",
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "accessTokenLifespan": 1800,
+  "signingAlgorithm": "RS256",
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "Regular user",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "ecom-realm"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrator",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "ecom-realm"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ecom-frontend",
+      "name": "Ecom Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "consentRequired": false,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "user",
+      "enabled": true,
+      "firstName": "Regular",
+      "lastName": "User",
+      "email": "user@ecom.local",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "user123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "email": "admin@ecom.local",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "ADMIN"
+      ]
+    }
+  ]
+}

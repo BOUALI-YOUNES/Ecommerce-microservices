@@ -2,8 +2,18 @@ server:
   port: 8080
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "http://localhost:9098/realms/micro-services"
   config:
     import: configserver:http://config-server:8888
   application:
     name: api-gateway
   
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
