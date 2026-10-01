@@ -7,8 +7,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # jwk-set-uri: http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs
-          issuer-uri: http://keycloak:8080/realms/ecom-realm
+          # Keys are fetched over the docker network (internal hostname).
+          # Issuer is validated separately against the external hostname below,
+          # because tokens minted on the host carry the external iss claim.
+          jwk-set-uri: http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs
   application:
     name: api-gateway
   cloud:
@@ -40,6 +42,8 @@ eureka:
   client:
     service-url:
           defaultZone: http://${EUREKA_HOST:discovery-server}:8761/eureka
+keycloak:
+  issuer-uri: http://localhost:9098/realms/ecom-realm
 management:
   endpoints:
     web:
