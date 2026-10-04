@@ -1,10 +1,16 @@
 # ---- Runtime image (jar is built on the host) ----
-# Heap is a percentage of the *container* limit (set with mem_limit in
-# docker-compose.yml), not of host RAM. Left unset, every JVM defaults to 25% of
-# host memory, so eight containers over-commit and the kernel OOM-killer takes down
-# arbitrary services. ExitOnOutOfMemoryError makes the JVM die fast and be restarted
-# by the restart policy instead of limping along in an unusable state.
+# The heap is pinned with an explicit -Xmx instead of MaxRAMPercentage. A percentage
+# is resolved against whatever the JVM believes the machine has: with no mem_limit in
+# compose the gateway, config-server and discovery each sized themselves against the
+# whole Docker VM and committed gigabytes at boot, which is what drove the OOM kills.
+# An explicit value is identical on every host and cannot drift.
+#
+# The container limit (mem_limit in docker-compose.yml) must stay comfortably above
+# heap + metaspace + code cache + thread stacks + direct buffers, so MaxMetaspaceSize
+# and ReservedCodeCacheSize are bounded too rather than left to grow unchecked.
+# ExitOnOutOfMemoryError makes the JVM die fast and be restarted by the restart policy
+# instead of limping along in an unusable state.
 FROM eclipse-temurin:21
 WORKDIR /app
 COPY target/*.jar app.jar
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60.0","-XX:InitialRAMPercentage=60.0","-XX:+ExitOnOutOfMemoryError", "--add-opens", "java.base/java.time=ALL-UNNAMED", "-jar", "app.jar"]
+ENTRYPOINT ["java","-Xms64m","-Xmx256m","-XX:MaxMetaspaceSize=160m","-XX:ReservedCodeCacheSize=48m","-XX:+ExitOnOutOfMemoryError","-jar","app.jar"]

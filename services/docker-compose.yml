@@ -1,5 +1,9 @@
 services:
   config-server:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 448m
+    mem_reservation: 256m
     build:
       context: ./config-server
       dockerfile: dockerfile
@@ -17,6 +21,10 @@ services:
     restart: unless-stopped
 
   discovery-server:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 448m
+    mem_reservation: 256m
     build:
       context: ./discovery
       dockerfile: dockerfile
@@ -38,6 +46,9 @@ services:
     
 
   postgres:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 256m
+    mem_reservation: 128m
     container_name: ms_postgresql
     image: postgres:16
     environment:
@@ -63,6 +74,9 @@ services:
     restart: unless-stopped
 
   pgadmin:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 384m
+    mem_reservation: 192m
     container_name: ms_pgadmin
     image: dpage/pgadmin4
     environment:
@@ -80,6 +94,9 @@ services:
     restart: unless-stopped
 
   mongodb:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 384m
+    mem_reservation: 192m
     container_name: ms_mongo
     image: mongo:7
     ports:
@@ -100,6 +117,9 @@ services:
     restart: unless-stopped
 
   mongo-express:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 128m
+    mem_reservation: 64m
     container_name: ms_mongo_express
     image: mongo-express
     restart: always
@@ -115,6 +135,9 @@ services:
       - mongodb
 
   maildev:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 160m
+    mem_reservation: 80m
     image: maildev/maildev
     container_name: ms_mail_dev
     ports:
@@ -125,6 +148,9 @@ services:
     restart: unless-stopped
 
   zipkin:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 384m
+    mem_reservation: 192m
     image: openzipkin/zipkin
     container_name: ms_zipkin
     ports:
@@ -133,6 +159,9 @@ services:
       - ms-net
   
   zookeeper:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 256m
+    mem_reservation: 128m
     image: confluentinc/cp-zookeeper:7.7.1
     container_name: ms_zookeeper
     environment:
@@ -144,6 +173,9 @@ services:
       - ms-net
 
   kafka:
+    # Cap so a single container cannot squeeze the others; sized from measured use.
+    mem_limit: 640m
+    mem_reservation: 320m
     image: confluentinc/cp-kafka:7.7.1
     container_name: ms_kafka
     ports:
@@ -170,6 +202,10 @@ services:
     restart: unless-stopped
 
   api-gateway:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 512m
+    mem_reservation: 288m
     build:
       context: ./api-gateway
       dockerfile: dockerfile
@@ -192,12 +228,13 @@ services:
     restart: unless-stopped
 
   customer-service:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 640m
+    mem_reservation: 384m
     build:
       context: ./customer
       dockerfile: dockerfile
-    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
-    mem_limit: 1g
-    mem_reservation: 1g
     healthcheck:
       test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8090/actuator/health"]
       interval: 15s
@@ -220,12 +257,13 @@ services:
     restart: unless-stopped
 
   product-service:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 704m
+    mem_reservation: 448m
     build:
       context: ./product
       dockerfile: dockerfile
-    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
-    mem_limit: 1g
-    mem_reservation: 1g
     healthcheck:
       test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8050/actuator/health"]
       interval: 15s
@@ -248,12 +286,13 @@ services:
     restart: unless-stopped
 
   order-service:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 768m
+    mem_reservation: 512m
     build:
       context: ./order
       dockerfile: dockerfile
-    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
-    mem_limit: 1g
-    mem_reservation: 1g
     healthcheck:
       test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8070/actuator/health"]
       interval: 15s
@@ -279,12 +318,13 @@ services:
     restart: unless-stopped
 
   payment-service:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 704m
+    mem_reservation: 448m
     build:
       context: ./payement
       dockerfile: dockerfile
-    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
-    mem_limit: 1g
-    mem_reservation: 1g
     healthcheck:
       test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8055/actuator/health"]
       interval: 15s
@@ -310,12 +350,13 @@ services:
     restart: unless-stopped
 
   notification-service:
+    # Heap, metaspace and code cache are pinned in the service dockerfile; keep
+    # this limit above their sum to leave room for thread stacks and buffers.
+    mem_limit: 576m
+    mem_reservation: 320m
     build:
       context: ./notification
       dockerfile: dockerfile
-    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
-    mem_limit: 768m
-    mem_reservation: 768m
     healthcheck:
       test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8040/actuator/health"]
       interval: 15s
@@ -344,6 +385,10 @@ services:
     restart: unless-stopped
   
   keycloak:
+    # Heap is pinned by JAVA_OPTS below; keep this limit above heap plus
+    # metaspace so the JVM still has room for thread stacks and buffers.
+    mem_limit: 768m
+    mem_reservation: 448m
     container_name: keycloak_ms
     image: quay.io/keycloak/keycloak:24.0.2
     ports:
@@ -351,12 +396,28 @@ services:
     environment:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      # Keycloak has no dockerfile of ours, so its heap is bounded here instead.
+      # Left alone it sizes itself against the whole Docker VM, and start-dev is the
+      # heaviest single process in the stack.
+      - JAVA_OPTS=-Xms64m -Xmx320m -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError
     networks:
       - ms-net
     volumes:
       # Without this import the realm never exists, so every token request fails and
       # the resource servers reject all authenticated traffic.
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      # Without a volume here Keycloak starts with an empty database on every boot,
+      # re-imports the realm and mints new internal user ids. Customer profiles are
+      # keyed by that id, so every stack restart silently orphaned them and orders
+      # then failed with "no customer profile is associated with the authenticated
+      # user". Mounted on the h2 directory so the import file above stays visible.
+      - keycloak-db:/opt/keycloak/data/h2
+    # The h2 volume is created root-owned, and Keycloak's uid 1000 then cannot write
+    # its lock file ("Could not save properties .../keycloakdb.lock.db"). Running as
+    # root is acceptable for this dev-only stack and avoids a manual chown step that
+    # everybody would forget; a real deployment should use a properly owned image or
+    # point KC_DB at a database server.
+    user: root
     command: 
       - "start-dev"
       - "--import-realm"
@@ -369,3 +430,4 @@ volumes:
   postgres:
   pgadmin:
   mongodb:
+  keycloak-db:
