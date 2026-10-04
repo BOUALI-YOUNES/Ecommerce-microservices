@@ -37,68 +37,225 @@
 ## 🏗️ Architecture
 
 ```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"17px"},"flowchart":{"nodeSpacing":2,"rankSpacing":50,"padding":6,"curve":"basis"}}}%%
 graph TB
-    Client([Browser / Client])
+    CLIENT(["🖥️  Client"])
 
-    subgraph edge["Edge"]
-        GW["🛡️ API Gateway<br/><b>:8080</b> · WebFlux · JWT"]
-        KC["🔑 Keycloak<br/>:9098 · realm ecom-realm"]
-    end
+    GW["🛡️  API Gateway<br/>:8080"]
+    KC["🔑  Keycloak<br/>:9098"]
 
-    subgraph app["Application services — no host ports, JWT validated locally"]
-        CU["👤 Customer<br/>:8090 · MongoDB"]
-        PR["📦 Product<br/>:8050 · PostgreSQL"]
-        OR["🧾 Order<br/>:8070 · PostgreSQL"]
-        PAY["💳 Payment<br/>:8055 · PostgreSQL"]
-        NT["📨 Notification<br/>:8040 · MongoDB"]
-    end
+    CU["👤  Customer<br/>:8090 · MongoDB"]
+    PR["📦  Product<br/>:8050 · PostgreSQL"]
+    OR["🧾  Order<br/>:8070 · PostgreSQL"]
+    PAY["💳  Payment<br/>:8055 · PostgreSQL"]
+    NT["📨  Notification<br/>:8040 · MongoDB"]
 
-    subgraph infra["Platform"]
-        CFG["⚙️ Config Server<br/>:8888"]
-        EU["🧭 Discovery<br/>:8761"]
-        KFK["📨 Kafka"]
-        ZK[("PostgreSQL")]
-        MGO[("MongoDB")]
-        ZP["🔍 Zipkin<br/>:9411"]
-    end
+    KFK[("📨  Kafka")]
 
-    Client -->|"HTTPS + Bearer token"| GW
-    Client -.->|"password grant"| KC
-    GW -->|"validate"| KC
+    PG[("🗄️  PostgreSQL")]
+    MG[("🍃  MongoDB")]
 
-    GW --> CU
-    GW --> PR
-    GW --> OR
+    CFG["⚙️  Config<br/>:8888"]
+    EU["🧭  Discovery<br/>:8761"]
+    ZP["🔍  Zipkin<br/>:9411"]
+    MD["📮  MailDev<br/>:1080"]
 
-    OR -->|"lb:// + relayed JWT"| CU
-    OR -->|"lb:// + relayed JWT"| PR
-    OR -->|"lb:// + relayed JWT"| PAY
+    CLIENT -->|HTTPS| GW
+    CLIENT -.->|token| KC
+    GW -.->|validate| KC
 
-    OR -->|"order-topic"| KFK
-    PAY -->|"payment-topic"| KFK
+    GW ==> CU & PR & OR
+    OR ==>|lb://| CU & PR & PAY
+
+    OR -->|order-topic| KFK
+    PAY -->|payment-topic| KFK
     KFK --> NT
-    NT -->|"SMTP"| MD[("MailDev")]
 
-    CU --> MGO
-    NT --> MGO
-    PR --> ZK
-    OR --> ZK
-    PAY --> ZK
+    CU --> MG
+    NT --> MG
+    NT --> MD
+    PR & OR & PAY --> PG
 
-    CFG -.->|"config"| CU & PR & OR & PAY & NT
-    EU -.->|"registry"| GW & CU & PR & OR & PAY & NT
-    GW -.-> ZP
+    CFG -.->|config| CU
+    EU -.->|registry| GW
     OR -.-> ZP
 
-    classDef edge fill:#1f6feb,stroke:#0d419d,color:#fff
-    classDef app fill:#238636,stroke:#1a5e2a,color:#fff
-    classDef infra fill:#8957e5,stroke:#5f3fb0,color:#fff
-    classDef store fill:#6e7681,stroke:#484f58,color:#fff
+    classDef cli fill:#111827,stroke:#000000,color:#ffffff,stroke-width:3px
+    classDef edge fill:#1f6feb,stroke:#0b3f8f,color:#ffffff,stroke-width:3px
+    classDef app fill:#1a7f37,stroke:#0d4a20,color:#ffffff,stroke-width:3px
+    classDef bus fill:#7c3aed,stroke:#4a1d95,color:#ffffff,stroke-width:3px
+    classDef data fill:#0e6e75,stroke:#05383d,color:#ffffff,stroke-width:3px
+    classDef plat fill:#b45309,stroke:#71350f,color:#ffffff,stroke-width:3px
+    class CLIENT cli
     class GW,KC edge
     class CU,PR,OR,PAY,NT app
-    class CFG,EU,KFK,ZP infra
-    class ZK,MGO,MD store
+    class KFK bus
+    class PG,MG data
+    class CFG,EU,ZP,MD plat
+
+    GW ~~~ CU ~~~ KFK ~~~ PG ~~~ CFG
 ```
+
+| Colour | Tier |
+|---|---|
+| ⬛ black | Client |
+| ⬛ blue | Edge — gateway and identity |
+| 🟩 green | Application services |
+| 🟪 purple | Event bus |
+| 🟦 teal | Data stores |
+| 🟧 orange | Platform — config, discovery, tracing, mail |
+
+Solid arrows are synchronous calls, thick arrows are load-balanced `lb://` calls, and dotted
+arrows are configuration or telemetry rather than request traffic.
+
+### 🧬 Domain model
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"16px"},"flowchart":{"nodeSpacing":6,"rankSpacing":54,"padding":7,"curve":"basis"}}}%%
+graph TB
+
+    CUSTOMER["👤 Customer<br/>id · keycloakId · email<br/>firstname · lastname"]
+    ADDRESS["🏠 Address<br/>street · houseNumber · zipCode"]
+
+    CATEGORY["🗂️ Category<br/>id · name · description"]
+    PRODUCT["📦 Product<br/>id · name · description<br/>price · availableQuantity"]
+
+    ORDER["🧾 Order<br/>id · reference · totalAmount<br/>customerId · status"]
+    ORDERLINE["📄 OrderLine<br/>id · productId · quantity"]
+    OSTATUS["🚦 OrderStatus<br/>PENDING · PAID · FAILED · CANCELLED"]
+    PMETHOD["💳 PaymentMethod<br/>PAYPAL · MASTER_CARD · VISA · BITCOIN"]
+
+    PAYMENT["🧾 Payment<br/>id · amount · orderId<br/>paymentMethode · createdAt"]
+
+    CONF["📨 OrderConfirmation<br/>orderReference · totaleAmount<br/>paymentMethod"]
+    NOTIF["📨 Notification<br/>id · notificationType · notificDateTime"]
+
+    CUSTOMER --> ADDRESS
+    CATEGORY --> PRODUCT
+    ORDER --> ORDERLINE
+    ORDER -.-> OSTATUS
+    ORDER -.-> PMETHOD
+    PAYMENT -.-> PMETHOD
+    CONF -.-> PMETHOD
+
+    CUSTOMER ==>|order.customerId| ORDER
+    PRODUCT ==>|orderLine.productId| ORDERLINE
+    ORDER ==>|payment.orderId| PAYMENT
+    ORDER -->|order-topic| CONF
+    PAYMENT -->|payment-topic| CONF
+    CONF --> NOTIF
+
+    classDef cus fill:#1f6feb,stroke:#0b3f8f,color:#fff,stroke-width:3px
+    classDef cat fill:#0e6e75,stroke:#05383d,color:#fff,stroke-width:3px
+    classDef ord fill:#1a7f37,stroke:#0d4a20,color:#fff,stroke-width:3px
+    classDef bil fill:#7c3aed,stroke:#4a1d95,color:#fff,stroke-width:3px
+    classDef msg fill:#b45309,stroke:#71350f,color:#fff,stroke-width:3px
+    classDef aux fill:#374151,stroke:#111827,color:#fff,stroke-width:2px
+
+    class CUSTOMER,ADDRESS cus
+    class CATEGORY,PRODUCT cat
+    class ORDER,ORDERLINE ord
+    class PAYMENT bil
+    class CONF,NOTIF msg
+    class OSTATUS,PMETHOD aux
+
+    CUSTOMER ~~~ CATEGORY ~~~ ORDER ~~~ CONF
+```
+
+<details>
+<summary><b>🔑 The distinction that matters here</b></summary>
+
+**Solid arrows are real foreign keys**, and they only ever exist *inside* one service:
+
+- `Category 1──▸ n Product` — `@OneToMany`, same PostgreSQL database
+- `Order 1──▸ n OrderLine` — `@OneToMany` + `@JoinColumn(order_id)`, same database
+
+**Thick arrows are references across a service boundary.** They are plain integers or
+strings, resolved over `lb://`, and there is **no database-level integrity between them**:
+
+- `order.customerId` → `customer.id` — taken from the JWT subject, so a client cannot set it
+- `orderLine.productId` → `product.id` — resolved during the purchase call
+- `payment.orderId` → `order.id`
+
+That is the trade-off of microservices: `order` owns the *transaction* across three services,
+which is why it needs the compensating release when a later step fails. There is no
+distributed transaction, so consistency is per-service plus that compensation.
+
+Note the deliberately duplicated `Customer` types: the one in `customer-service` is a Mongo
+document, the one inside `OrderConfirmation` is a Kafka event payload. They are separate
+types in separate processes, not a shared class.
+</details>
+
+### 🧱 Class diagram
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"16px"}}}%%
+classDiagram
+    direction LR
+
+    class OrderService {
+        -CustomerClient customerClient
+        -ProductClient productClient
+        -PaymentClient paymentClient
+        -OrderCompensation compensation
+        -OrderProducer orderProducer
+        +createOrder(req, customerId)
+        -resolveCustomer()
+    }
+
+    class OrderCompensation {
+        -ProductClient productClient
+        -release(lines)
+    }
+
+    class ProductClient {
+        +purchaseProduct(request)
+        +releaseStock(request)
+    }
+
+    class OrderStatus {
+        <<enumeration>>
+        PENDING
+        PAID
+        FAILED
+        CANCELLED
+    }
+
+    class PaymentMethod {
+        <<enumeration>>
+        PAYPAL
+        MASTER_CARD
+        VISA
+        BITCOIN
+    }
+
+    OrderService ..> OrderCompensation : on rollback
+    OrderCompensation ..> ProductClient : releases via
+    OrderService ..> ProductClient : reserves via
+```
+
+<details>
+<summary><b>🎯 What this diagram is for</b></summary>
+
+This is deliberately **not** a map of every class. The entities and their fields are already in
+the domain model above, so repeating them here would only make the diagram unreadable. What is
+left is the part that carries the correctness guarantee:
+
+- **`OrderService` holds both halves of the stock protocol** — `ProductClient` to reserve, and
+  `OrderCompensation` to release. Everything needed to undo a partial order is wired into one
+  object, which is what makes the rollback auditable.
+- **`OrderCompensation` depends on `ProductClient`, not on `ProductService`.** The release is a
+  second guarded call with its own circuit breaker, so a failing release cannot take down order
+  creation.
+- **`createOrder` takes `customerId` as a parameter.** The service resolves the buyer itself via
+  `resolveCustomer()` from the validated JWT, so a client cannot order on someone else's account.
+- `PaymentMethod` and `OrderStatus` are plain string-mapped enums — the database stores the
+  constant name, not an ordinal.
+
+The corresponding security fix lives in `CustomerService.findById(id, callerId, isAdmin)`:
+making authorization a required argument rather than something the method looks up itself is what
+removed the IDOR, because the old signature could not express *"is this my account?"*.
+</details>
 
 **Only the gateway and the platform publish host ports.** The five business services listen on
 container-internal ports and validate the JWT themselves, so anything that reaches them on the
@@ -158,35 +315,53 @@ Every one of the 17 containers has a `mem_limit`, and every JVM has an explicit 
 than a percentage of the machine:
 
 ```mermaid
-graph LR
-    VM["Docker VM<br/>6.0 GB cap"]
-    subgraph JVMs["JVMs — 4.15 GB actual"]
-        direction TB
-        O["order<br/>768m / -Xmx352m"]
-        P["product<br/>704m / -Xmx320m"]
-        Y["payment<br/>704m / -Xmx320m"]
-        C["customer<br/>640m / -Xmx288m"]
-        K["keycloak<br/>768m / -Xmx320m"]
-        G["gateway<br/>512m / -Xmx224m"]
-        N["notification<br/>576m / -Xmx256m"]
-    end
-    subgraph DB["Data + broker — 1.15 GB actual"]
-        direction TB
-        KF["kafka 640m"]
-        MO["mongodb 384m"]
-        PO["postgres 256m"]
-        ZK["zookeeper 256m"]
-    end
-    VM --- JVMs
-    VM --- DB
+%%{init: {"theme":"base","themeVariables":{"fontSize":"16px"},"flowchart":{"nodeSpacing":2,"rankSpacing":44,"padding":6,"curve":"basis"}}}%%
+graph TB
+
+    BEFORE["❌ BEFORE<br/>12 uncapped<br/>4.59 GB actual"]
+    VM[("🖥️  Docker VM<br/>6.0 GB")]
+    AFTER["✅ AFTER<br/>17 capped<br/>3.98 GB actual"]
+
+    G1["App JVMs (8)<br/>4.69 GB"]
+    G2["Keycloak<br/>768 MB"]
+    G3["Broker<br/>Kafka + Zookeeper<br/>896 MB"]
+    G4["Data<br/>PostgreSQL + MongoDB<br/>640 MB"]
+    G5["Tracing<br/>Zipkin<br/>384 MB"]
+    G6["Dev tools<br/>pgAdmin + express<br/>+ MailDev<br/>672 MB"]
+
+    CAPS["Sum of caps: 7.97 GB<br/>caps are ceilings,<br/>not reservations<br/>3.98 GB actually used"]
+
+    BEFORE -->|"jvm sized against<br/>the whole VM"| VM
+    VM -->|"explicit -Xmx<br/>+ mem_limit"| AFTER
+    VM -.-> G1 & G2 & G3 & G4 & G5 & G6
+    G1 & G2 & G3 & G4 & G5 & G6 -.-> CAPS
+
+    classDef bad fill:#b91c1c,stroke:#7f1d1d,color:#fff,stroke-width:3px
+    classDef vm fill:#111827,stroke:#000,color:#fff,stroke-width:3px
+    classDef good fill:#15803d,stroke:#14532d,color:#fff,stroke-width:3px
+    classDef grp fill:#0e6e75,stroke:#05383d,color:#fff,stroke-width:2px
+    classDef note fill:#b45309,stroke:#71350f,color:#fff,stroke-width:2px
+    class BEFORE bad
+    class VM vm
+    class AFTER good
+    class G1,G2,G3,G4,G5,G6 grp
+    class CAPS note
+
+    BEFORE ~~~ G1 ~~~ CAPS
 ```
 
 | Metric | Before | After |
 |---|---:|---:|
-| Memory in use | 4.59 GB | **4.00 GB** |
+| Memory actually in use | 4.59 GB | **3.98 GB** |
 | Headroom under the 6 GB cap | 1.3 GB | **2.0 GB** |
 | Containers with no limit | 12 | **0** |
 | `Exited (137)` in one cascade | 8 | **0** |
+| JVMs killed by a real OOM | 1 (`order`, metaspace) | **0** |
+
+> [!NOTE]
+> The caps add up to **7.97 GB**, which is deliberately *more* than the 6 GB VM. `mem_limit` is a
+> ceiling, not a reservation — the containers that sit idle never approach theirs. What matters is
+> the 3.98 GB actually used, which leaves real headroom for a burst.
 
 <details>
 <summary><b>⚠️ Why a percentage heap was the real bug</b></summary>
