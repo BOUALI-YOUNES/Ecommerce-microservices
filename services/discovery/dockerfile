@@ -1,5 +1,10 @@
 # ---- Runtime image (jar is built on the host) ----
+# Heap is a percentage of the *container* limit (set with mem_limit in
+# docker-compose.yml), not of host RAM. Left unset, every JVM defaults to 25% of
+# host memory, so eight containers over-commit and the kernel OOM-killer takes down
+# arbitrary services. ExitOnOutOfMemoryError makes the JVM die fast and be restarted
+# by the restart policy instead of limping along in an unusable state.
 FROM eclipse-temurin:21
 WORKDIR /app
 COPY target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60.0","-XX:InitialRAMPercentage=60.0","-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]

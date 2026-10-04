@@ -9,7 +9,6 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "accessTokenLifespan": 1800,
-  "signingAlgorithm": "RS256",
   "roles": {
     "realm": [
       {

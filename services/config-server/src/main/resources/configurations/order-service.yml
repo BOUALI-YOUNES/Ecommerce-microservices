@@ -4,22 +4,112 @@ spring:
         username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
         driver-class-name: org.postgresql.Driver
+        hikari:
+            # Sized explicitly: the default pool of 10 is exhausted by a burst long
+            # before Tomcat's default 200 request threads.
+            maximum-pool-size: ${DB_POOL_SIZE:20}
+            minimum-idle: ${DB_POOL_MIN_IDLE:5}
+            connection-timeout: 3000
+            pool-name: order-db-pool
     jpa:
         hibernate:
-            ddl-auto: create
+            # Never create/drop here: the schema is owned by Flyway. The previous
+            # "create" wiped all orders on every restart.
+            ddl-auto: validate
         database: postgresql
         database-platform: org.hibernate.dialect.PostgreSQLDialect
+        open-in-view: false
+    flyway:
+        enabled: true
+        baseline-on-migrate: true
+        baseline-description: "init"
+        baseline-version: 0
+        user: ${POSTGRES_USER}
+        password: ${POSTGRES_PASSWORD}
     kafka:
+        # Required at the top level, not just under producer: the NewTopic beans
+        # make Boot create a KafkaAdmin, and that client reads
+        # spring.kafka.bootstrap-servers. Without it the admin client fell back to
+        # localhost:9092 inside the container and every fetchMetadata call timed out.
+        bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
         producer:
             bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
             value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
             properties:
                 spring.json.type.mapping: orderConfirmation:com.younes.order.kafka.OrderConfirmation
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    # Keys come over the docker network, the iss claim is validated
+                    # against the external issuer the tokens actually carry.
+                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs}
+
 server:
     port: 8070
+keycloak:
+    issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9098/realms/ecom-realm}
 application:
     config:
-        customer-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/customers
-        product-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/products/purchase
-        payment-url: http://${GATEWAY_HOST:localhost}:8080/api/v1/payment 
+        # Budgets for the service-to-service call. The previous RestTemplate had no
+        # timeouts at all and could block a request thread indefinitely.
+        connect-timeout: ${INTERNAL_CONNECT_TIMEOUT:2s}
+        read-timeout: ${INTERNAL_READ_TIMEOUT:10s}
+        feign:
+            connect-timeout: ${INTERNAL_CONNECT_TIMEOUT_MS:2000}
+            read-timeout: ${INTERNAL_READ_TIMEOUT_MS:10000}
+
+resilience4j:
+    circuitbreaker:
+        instances:
+            productService:
+                # A rejected purchase (insufficient stock, invalid payload) is normal
+                # business, not an outage. Counting these as failures opened the circuit
+                # after a handful of failed orders and made every later order fail with
+                # "service unavailable".
+                #
+                # Only ignore-exceptions may be used here: record-exceptions is an
+                # allowlist that overrides it, and listing the BusinessException
+                # supertype there re-recorded the rejections anyway, because the
+                # rejection type extends it.
+                ignore-exceptions:
+                    - com.younes.order.exception.ProductPurchaseRejectedException
+                sliding-window-type: COUNT_BASED
+                sliding-window-size: 20
+                minimum-number-of-calls: 10
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 10s
+                permitted-number-of-calls-in-half-open-state: 3
+            customerService:
+                sliding-window-type: COUNT_BASED
+                sliding-window-size: 20
+                minimum-number-of-calls: 10
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 10s
+                permitted-number-of-calls-in-half-open-state: 3
+            paymentService:
+                sliding-window-type: COUNT_BASED
+                sliding-window-size: 20
+                minimum-number-of-calls: 10
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 10s
+                permitted-number-of-calls-in-half-open-state: 3
+            # Separate breaker from productService so that a burst of failing
+            # compensations cannot open the circuit in front of new orders.
+            productServiceRelease:
+                sliding-window-type: COUNT_BASED
+                sliding-window-size: 20
+                minimum-number-of-calls: 10
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 30s
+                permitted-number-of-calls-in-half-open-state: 3
+
+feign:
+    client:
+        config:
+            default:
+                connectTimeout: ${application.config.feign.connect-timeout}
+                readTimeout: ${application.config.feign.read-timeout}
+    micrometer:
+        enabled: true

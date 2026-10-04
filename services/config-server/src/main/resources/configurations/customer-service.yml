@@ -6,5 +6,19 @@ spring:
       host: ${DB_HOST:localhost}
       database: customer
       authentication-database: admin
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys come over the docker network, the iss claim is validated against
+          # the external issuer the tokens actually carry.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs}
 server:
   port: 8090
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9098/realms/ecom-realm}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

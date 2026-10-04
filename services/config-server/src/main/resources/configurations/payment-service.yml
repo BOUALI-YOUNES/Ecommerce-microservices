@@ -1,5 +1,10 @@
 spring:
     kafka:
+        # Required at the top level, not just under producer: the NewTopic beans
+        # make Boot create a KafkaAdmin, and that client reads
+        # spring.kafka.bootstrap-servers. Without it the admin client fell back to
+        # localhost:9092 inside the container and every fetchMetadata call timed out.
+        bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
         producer:
             bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -11,10 +16,37 @@ spring:
         username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
         driver-class-name: org.postgresql.Driver
+        hikari:
+            maximum-pool-size: ${DB_POOL_SIZE:20}
+            minimum-idle: ${DB_POOL_MIN_IDLE:5}
+            connection-timeout: 3000
+            pool-name: payment-db-pool
     jpa:
         hibernate:
-            ddl-auto: create
+            # The previous "create" dropped and recreated the payment table on every
+            # restart, silently destroying all payment records.
+            ddl-auto: validate
         database: postgresql
         database-platform: org.hibernate.dialect.PostgreSQLDialect
+        open-in-view: false
+    flyway:
+        enabled: true
+        baseline-on-migrate: true
+        baseline-description: "init"
+        baseline-version: 0
+        user: ${POSTGRES_USER}
+        password: ${POSTGRES_PASSWORD}
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs}
 server:
     port: 8055
+keycloak:
+    issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9098/realms/ecom-realm}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

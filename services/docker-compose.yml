@@ -46,6 +46,10 @@ services:
       - PGDATA=/var/lib/postgresql/data
     volumes:
       - postgres:/var/lib/postgresql/data
+      # Creates the order/product/payment databases on first initialisation. This
+      # script was previously never mounted, so the three JPA services failed on a
+      # fresh volume and the databases had to be created by hand.
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
     ports:
       - 5433:5432
     networks:
@@ -191,9 +195,15 @@ services:
     build:
       context: ./customer
       dockerfile: dockerfile
-    container_name: ms_customer
-    ports:
-      - "8090:8090"
+    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
+    mem_limit: 1g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8090/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       - MONGO_USER=${MONGO_USER}
       - MONGO_PASSWORD=${MONGO_PASSWORD}
@@ -213,9 +223,15 @@ services:
     build:
       context: ./product
       dockerfile: dockerfile
-    container_name: ms_product
-    ports:
-      - "8050:8050"
+    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
+    mem_limit: 1g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8050/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -235,15 +251,20 @@ services:
     build:
       context: ./order
       dockerfile: dockerfile
-    container_name: ms_order
-    ports:
-      - "8070:8070"
+    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
+    mem_limit: 1g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8070/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=postgres
       - KAFKA_BOOTSTRAP=kafka:29092
-      - GATEWAY_HOST=api-gateway
     depends_on:
       config-server:
         condition: service_healthy
@@ -253,8 +274,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      api-gateway:
-        condition: service_healthy
     networks:
       - ms-net
     restart: unless-stopped
@@ -263,9 +282,15 @@ services:
     build:
       context: ./payement
       dockerfile: dockerfile
-    container_name: ms_payment
-    ports:
-      - "8055:8055"
+    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
+    mem_limit: 1g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8055/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -288,9 +313,15 @@ services:
     build:
       context: ./notification
       dockerfile: dockerfile
-    container_name: ms_notification
-    ports:
-      - "8040:8040"
+    # Container memory limit: the JVM heap is a percentage of this (see dockerfile).
+    mem_limit: 768m
+    mem_reservation: 768m
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "-f", "http://localhost:8040/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       - MONGO_USER=${MONGO_USER}
       - MONGO_PASSWORD=${MONGO_PASSWORD}
@@ -322,8 +353,13 @@ services:
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     networks:
       - ms-net
+    volumes:
+      # Without this import the realm never exists, so every token request fails and
+      # the resource servers reject all authenticated traffic.
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     command: 
       - "start-dev"
+      - "--import-realm"
 
 networks:
   ms-net:

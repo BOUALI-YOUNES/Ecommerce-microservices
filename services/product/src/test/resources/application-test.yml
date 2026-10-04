@@ -1,0 +1,21 @@
+spring:
+  config:
+    import: ""
+  datasource:
+    url: jdbc:h2:mem:product;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:1/jwks
+keycloak:
+  issuer-uri: http://localhost:1/realms/test

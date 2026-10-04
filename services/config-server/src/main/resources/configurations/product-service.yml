@@ -4,11 +4,17 @@ spring:
         username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
         driver-class-name: org.postgresql.Driver
+        hikari:
+            maximum-pool-size: ${DB_POOL_SIZE:20}
+            minimum-idle: ${DB_POOL_MIN_IDLE:5}
+            connection-timeout: 3000
+            pool-name: product-db-pool
     jpa:
         hibernate:
             ddl-auto: validate
         database: postgresql
         database-platform: org.hibernate.dialect.PostgreSQLDialect
+        open-in-view: false
     flyway:
         baseline-on-migrate: true
         enabled: true
@@ -16,5 +22,17 @@ spring:
         baseline-version: 0
         user: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/certs}
 server:
   port: 8050
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9098/realms/ecom-realm}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
