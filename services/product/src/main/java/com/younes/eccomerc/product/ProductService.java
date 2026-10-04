@@ -1,19 +1,18 @@
 package com.younes.eccomerc.product;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.younes.eccomerc.Exception.ProductPurchasException;
 
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -32,33 +31,62 @@ public class ProductService {
         return ResponseEntity.ok(productRepo.save(product).getId());
     }
 
+    /**
+     * Reserves stock for every requested line.
+     *
+     * Each decrement is a single conditional UPDATE, so concurrent purchases cannot
+     * oversell. The whole method runs in one transaction: if any line has insufficient
+     * stock the exception rolls back every decrement already applied, instead of
+     * leaving the first lines of a rejected order consumed.
+     *
+     * Duplicate product ids in one request are summed rather than rejected.
+     */
+    @Transactional
     public List<ProductPurchasResponse> purchasProducts(List<ProductPurchasRequest> productPurchasRequest) {
-        var productIds = productPurchasRequest
-                                    .stream()
-                                    .map(request -> request.getProductId())
-                                    .toList();
+        Map<Integer, Double> requestedQuantities = new LinkedHashMap<>();
+        for (ProductPurchasRequest request : productPurchasRequest) {
+            if (request.getQuantity() <= 0) {
+                throw new ProductPurchasException(
+                        "The quantity must be greater than zero for product with the ID :: "
+                                + request.getProductId());
+            }
+            requestedQuantities.merge(request.getProductId(), request.getQuantity(), Double::sum);
+        }
+
+        var productIds = List.copyOf(requestedQuantities.keySet());
         var storedProducts = productRepo.findAllByIdInOrderById(productIds);
-        if(productIds.size() != storedProducts.size()) {
+        if (storedProducts.size() != requestedQuantities.size()) {
             throw new ProductPurchasException("One or more products does not exists !");
         }
 
-        var sortedRequest = productPurchasRequest.stream().sorted(Comparator.comparing(product -> product.getProductId())).toList();
+        for (var entry : requestedQuantities.entrySet()) {
+            int updatedRows = productRepo.decrementStock(entry.getKey(), entry.getValue());
+            if (updatedRows == 0) {
+                throw new ProductPurchasException(
+                        "Cannot performe this purchase , Quantiy is not available for product with the ID :: "
+                                + entry.getKey());
+            }
+        }
+
+        // Re-read so the response carries authoritative post-decrement state.
+        var refreshedProducts = productRepo.findAllByIdInOrderById(productIds);
         var purchasProducts = new ArrayList<ProductPurchasResponse>();
-        for(int i = 0 ; i < sortedRequest.size() ; i++) {
-
-            var product = storedProducts.get(i);  // stored products comming form the db via the repo
-            var productRequest = sortedRequest.get(i); // client request products
-
-            if(product.getAvailableQuantity() < productRequest.getQuantity()) {
-                throw new ProductPurchasException("Cannot performe this purchase , Quantiy is not available for product with the ID :: " + productRequest.getProductId());
-            } 
-            // update the available quantity for the purchased product
-            var newAvailableQuantity = product.getAvailableQuantity() - productRequest.getQuantity();
-            product.setAvailableQuantity(newAvailableQuantity);
-            productRepo.save(product); //saving the new update
-            purchasProducts.add(productMapper.toProductPurchaseReponse(product , productRequest.quantity));
+        for (var product : refreshedProducts) {
+            double quantity = requestedQuantities.get(product.getId());
+            purchasProducts.add(productMapper.toProductPurchaseReponse(product, quantity));
         }
         return purchasProducts;
+    }
+
+    /**
+     * Returns reserved stock to the catalogue. Used to compensate an order that was
+     * rolled back after the reservation had already succeeded.
+     */
+    @Transactional
+    public void releaseProducts(List<ProductPurchasRequest> productPurchasRequest) {
+        for (ProductPurchasRequest request : productPurchasRequest) {
+            productRepo.incrementStock(request.getProductId(), request.getQuantity());
+        }
     }
 
     public ProductResponse getById(Integer productId) {

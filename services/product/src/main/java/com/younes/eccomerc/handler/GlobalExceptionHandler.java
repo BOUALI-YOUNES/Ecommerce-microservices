@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.younes.eccomerc.Exception.ProductPurchasException;
+import com.younes.eccomerc.product.ProductCategoryNotFoundException;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -25,7 +26,13 @@ public class GlobalExceptionHandler {
     
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<String> handle(EntityNotFoundException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
+    }
+
+    @ExceptionHandler(ProductCategoryNotFoundException.class)
+    public ResponseEntity<String> handle(ProductCategoryNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(e.getMessage());
     }
 

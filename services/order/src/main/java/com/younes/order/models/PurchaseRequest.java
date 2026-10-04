@@ -8,13 +8,12 @@ import lombok.Setter;
 /**
  * PurchaseRequest
  */
-@Getter 
-@Setter 
+@Getter
+@Setter
 public class PurchaseRequest {
 
-    @NotNull (message = "Product is mandatory")
+    @NotNull(message = "Product is mandatory")
     Integer productId;
-    @Positive (message = "Quantity is mandatory")
+    @Positive(message = "Quantity is mandatory and must be greater than zero")
     double quantity;
-
 }

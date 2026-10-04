@@ -26,8 +26,18 @@ public class ProductController {
     }
 
     @PostMapping("/purchase")
-    public ResponseEntity<List<ProductPurchasResponse>> purchasProducts(@RequestBody List<ProductPurchasRequest> productPurchasRequest) {
+    public ResponseEntity<List<ProductPurchasResponse>> purchasProducts(
+            @RequestBody @Valid List<@Valid ProductPurchasRequest> productPurchasRequest
+    ) {
         return ResponseEntity.ok(productService.purchasProducts(productPurchasRequest));
+    }
+
+    @PostMapping("/purchase/release")
+    public ResponseEntity<Void> releaseProducts(
+            @RequestBody @Valid List<@Valid ProductPurchasRequest> productPurchasRequest
+    ) {
+        productService.releaseProducts(productPurchasRequest);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{product-id}")

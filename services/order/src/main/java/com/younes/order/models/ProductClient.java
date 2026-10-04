@@ -2,39 +2,134 @@ package com.younes.order.models;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import com.younes.order.exception.BusinessException;
+import com.younes.order.exception.ProductPurchaseRejectedException;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * ProductClient
  */
-@Service 
-@RequiredArgsConstructor 
+@Service
+@RequiredArgsConstructor
+@Slf4j
 public class ProductClient {
 
-    @Value("${application.config.product-url}")
-    private String productUrl;
+    /**
+     * Resolved through Eureka by @LoadBalanced, so the call reaches a healthy product
+     * instance instead of a single fixed gateway address.
+     */
+    private static final String PRODUCT_PURCHASE_URL = "http://product-service/api/v1/products/purchase";
+
+    private static final String PRODUCT_RELEASE_URL = "http://product-service/api/v1/products/purchase/release";
+
+    private static final ParameterizedTypeReference<List<PurchaseResponse>> RESPONSE_LIST =
+            new ParameterizedTypeReference<>() {
+            };
+
     private final RestTemplate restTemplate;
 
+    @CircuitBreaker(name = "productService", fallbackMethod = "purchaseProductFallback")
     public List<PurchaseResponse> purchaseProduct(List<PurchaseRequest> requestBody) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.CONTENT_TYPE, "application/json"); 
-        HttpEntity<List<PurchaseRequest>> requestEntity = new HttpEntity<>(requestBody , headers);
-        ParameterizedTypeReference<List<PurchaseResponse>> responseType = new ParameterizedTypeReference<>(){};
-        ResponseEntity<List<PurchaseResponse>> responseEntity = restTemplate.exchange(productUrl, HttpMethod.POST , requestEntity , responseType);
-        if(responseEntity.getStatusCode().isError()) {
-            throw new BusinessException("An error occured while processing the products purchases : " + responseEntity.getStatusCode());
+        try {
+            return exchangeForList(PRODUCT_PURCHASE_URL, requestBody);
+        } catch (HttpClientErrorException e) {
+            // 4xx means the request itself was rejected (bad payload, insufficient
+            // stock): surface it to the caller instead of masking it as an outage.
+            // Caught before the 5xx case because it is a subclass of
+            // RestClientResponseException.
+            throw new ProductPurchaseRejectedException(
+                    "The products purchase was rejected by the product service :: " + e.getMessage());
+        } catch (RestClientResponseException e) {
+            // 5xx is a genuine outage and is recorded by the breaker.
+            throw new BusinessException(
+                    "The product service failed while processing the purchase :: " + e.getMessage());
         }
-        return responseEntity.getBody( );
-    } 
+    }
+
+    /**
+     * Separate circuit breaker from {@link #purchaseProduct}. Sharing one breaker meant
+     * a burst of failing releases could open the circuit and reject healthy purchases.
+     */
+    @CircuitBreaker(name = "productServiceRelease", fallbackMethod = "releaseStockFallback")
+    public List<PurchaseResponse> releaseStock(List<PurchaseRequest> requestBody) {
+        try {
+            exchangeForList(PRODUCT_RELEASE_URL, requestBody);
+            return List.of();
+        } catch (HttpClientErrorException e) {
+            throw new ProductPurchaseRejectedException(
+                    "The stock release was rejected by the product service :: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Spring 7 removed the RestTemplate.postForObject overloads that took a
+     * ParameterizedTypeReference, so the generic list has to be read through exchange.
+     */
+    private List<PurchaseResponse> exchangeForList(String url, List<PurchaseRequest> requestBody) {
+        ResponseEntity<List<PurchaseResponse>> response = restTemplate.exchange(
+                url, HttpMethod.POST, new HttpEntity<>(requestBody), RESPONSE_LIST);
+        return response.getBody() == null ? List.of() : response.getBody();
+    }
+
+    /**
+     * Runs when the product service is unavailable or the circuit is open. Fails fast
+     * instead of holding the caller's thread and the order's stock reservation.
+     *
+     * <p>Resilience4j also routes ordinary exceptions through the fallback, so a
+     * rejected request (insufficient stock, validation error) arrives here too.
+     * Wrapping those in an "unavailable" message hid the real cause from clients and
+     * made a stock rejection look like an outage, so they are rethrown unchanged.
+     */
+    @SuppressWarnings("unused")
+    private List<PurchaseResponse> purchaseProductFallback(
+            List<PurchaseRequest> requestBody, Throwable throwable) {
+        ProductPurchaseRejectedException rejected = findRejectedException(throwable);
+        if (rejected != null) {
+            throw rejected;
+        }
+        throw new BusinessException(
+                "The product service is currently unavailable, the order cannot be completed :: "
+                        + throwable.getMessage());
+    }
+
+    private ProductPurchaseRejectedException findRejectedException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ProductPurchaseRejectedException rejected) {
+                return rejected;
+            }
+            current = current.getCause() == current ? null : current.getCause();
+        }
+        return null;
+    }
+
+    /**
+     * Runs when a compensation cannot be delivered. This deliberately does not throw:
+     * it runs from a post-rollback callback where an exception cannot fail the order
+     * (the order is already gone) and would only obscure the original cause. The error
+     * is logged loudly because the reserved stock is now stranded until it is
+     * reconciled manually.
+     */
+    @SuppressWarnings("unused")
+    private List<PurchaseResponse> releaseStockFallback(
+            List<PurchaseRequest> requestBody, Throwable throwable) {
+        log.error(
+                "STOCK COMPENSATION FAILED, order rejected but product stock is still reserved "
+                        + "and must be reconciled manually. lines={} cause={}",
+                requestBody,
+                throwable.toString());
+        return List.of();
+    }
 }

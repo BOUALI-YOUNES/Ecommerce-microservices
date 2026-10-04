@@ -7,6 +7,7 @@ import org.hibernate.annotations.ManyToAny;
 import com.younes.eccomerc.category.Category;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -31,7 +32,7 @@ public class Product {
     private String description;
     private double availableQuantity;
     private BigDecimal price;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="category_id")
     private Category category;
 

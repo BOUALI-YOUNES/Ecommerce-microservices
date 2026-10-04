@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -31,13 +32,15 @@ import lombok.Setter;
 @Entity 
 @Table (name = "customer_order")
 public class Order {
-    @Id 
+@Id 
     @GeneratedValue 
     private Integer id;
     private String reference;
-    private BigDecimal totalAmount ; 
-    @Enumerated
+    private BigDecimal totalAmount ;
+    @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
     private String customerId;
     @OneToMany (mappedBy = "order")
     private List<OrderLine> orderLines;
@@ -47,4 +50,16 @@ public class Order {
     @LastModifiedDate 
     @Column(insertable = false)
     private LocalDateTime lastModifiedDate;
+
+    /**
+     * Marks the order as paid. Guarded so a payment can only move an order that is
+     * still pending, rather than rewriting a cancelled or already-paid order.
+     */
+    public void markPaid() {
+        if (status != null && status != OrderStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Cannot mark an order with status " + status + " as paid");
+        }
+        this.status = OrderStatus.PAID;
+    }
 }

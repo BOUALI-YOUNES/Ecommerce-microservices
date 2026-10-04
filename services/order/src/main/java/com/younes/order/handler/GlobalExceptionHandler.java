@@ -4,6 +4,7 @@ import java.util.HashMap;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.younes.order.exception.BusinessException;
+import com.younes.order.exception.PaymentFailedException;
 
 import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,10 +28,20 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(FeignException.class)
     public ResponseEntity<String> handle(FeignException e) {
-        HttpStatus status = e.status() > 0
-                ? HttpStatus.valueOf(e.status())
-                : HttpStatus.INTERNAL_SERVER_ERROR;
+        // HttpStatus.valueOf throws for codes outside the known enum, which would mask
+        // the real failure as a 500. resolve() returns null instead.
+        HttpStatus status = HttpStatus.resolve(e.status()) != null
+                ? HttpStatus.resolve(e.status())
+                : HttpStatus.BAD_GATEWAY;
         return ResponseEntity.status(status)
+                    .body(e.getMessage());
+    }
+
+    @ExceptionHandler(PaymentFailedException.class)
+    public ResponseEntity<String> handle(PaymentFailedException e) {
+        // The downstream payment service failed, so this is a gateway/upstream problem
+        // rather than a malformed request.
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(e.getMessage());
     }
 
@@ -59,9 +71,15 @@ public class GlobalExceptionHandler {
                     .body(new ErrorResponse(errors));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<String> handle(HttpMessageNotReadableException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("The request body could not be read");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleException(Exception e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(e.getMessage());
+                    .body(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
     }
 }
