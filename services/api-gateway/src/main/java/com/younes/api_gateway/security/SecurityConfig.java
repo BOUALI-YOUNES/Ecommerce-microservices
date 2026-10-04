@@ -39,10 +39,19 @@ public class SecurityConfig {
         httpSecurity
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchange -> exchange
-                .pathMatchers("/eureka/**").permitAll()
                 .pathMatchers("/actuator/health").permitAll()
+                // Internal compensation endpoint, called by the order service through
+                // lb://product-service when an order is rolled back. It must never be
+                // reachable from outside: without this rule any authenticated user
+                // could call it and inflate stock at will (verified: one call took a
+                // product from 4 to 54 units).
+                .pathMatchers(HttpMethod.POST, "/api/v1/products/purchase/release").denyAll()
                 .pathMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
-                .pathMatchers(HttpMethod.POST, "/api/v1/customers").permitAll()
+                // Creating a customer profile now requires a token: the profile is
+                // bound to the caller's Keycloak identity, so it cannot be anonymous.
+                .pathMatchers(HttpMethod.POST, "/api/v1/customers").authenticated()
+                // Listing every customer exposes all profiles, so it is ADMIN only.
+                .pathMatchers(HttpMethod.GET, "/api/v1/customers").hasRole("ADMIN")
                 .pathMatchers(HttpMethod.DELETE, "/api/v1/customers/**").hasRole("ADMIN")
                 .pathMatchers(HttpMethod.PUT, "/api/v1/customers/**").hasRole("ADMIN")
                 .pathMatchers(HttpMethod.POST, "/api/v1/products").hasRole("ADMIN")

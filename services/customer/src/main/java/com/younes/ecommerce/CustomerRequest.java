@@ -10,13 +10,18 @@ import lombok.Setter;
 
 /**
  * CustomerResquest
+ *
+ * <p>There is deliberately no id field. It was previously copied straight onto the
+ * Mongo document, and because Mongo save() with a non-null _id replaces the document,
+ * the unauthenticated POST /api/v1/customers endpoint could overwrite any existing
+ * customer. The identifier is now generated, and updates address a customer through
+ * {@code /api/v1/customers/me} instead of a client-supplied id.
  */
 @AllArgsConstructor
-@NoArgsConstructor 
+@NoArgsConstructor
 @Getter
 @Setter
 public class CustomerRequest {
-    private String id;
     @NotBlank(message = "customer first name is required !")
     private String firstname;
     @NotBlank(message = "customer last name is required !")

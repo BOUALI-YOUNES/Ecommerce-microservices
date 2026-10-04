@@ -5,13 +5,30 @@ spring:
   security:
     oauth2:
       resourceserver:
-        jwt:
-          issuer-uri: "http://localhost:9098/realms/micro-services"
+        # No jwt.* properties here on purpose. An empty "jwt:" node fails to bind
+        # ("No setter found for property: jwt"), and a stale issuer-uri of
+        # "http://localhost:9098/realms/micro-services" used to sit here naming a
+        # realm that does not exist and pointing at localhost from inside a
+        # container. The JwtDecoder in SecurityConfig is built explicitly from the
+        # config-server values (jwk-set-uri over the docker network, issuer
+        # validated against the external host that tokens actually carry).
   config:
-    import: configserver:http://config-server:8888
+    import: optional:configserver:http://${CONFIG_HOST:config-server}:8888
   application:
     name: api-gateway
-  
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            # Previously unbounded: the gateway never timed out a slow backend and
+            # its connection pool was elastic, so one slow service could exhaust it.
+            connect-timeout: 2000
+            response-timeout: 10s
+            pool:
+              type: fixed
+              max-connections: 200
+
 management:
   endpoints:
     web:

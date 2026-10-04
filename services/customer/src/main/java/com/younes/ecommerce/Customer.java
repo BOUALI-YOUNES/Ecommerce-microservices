@@ -1,6 +1,7 @@
 package com.younes.ecommerce;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import jakarta.validation.constraints.Email;
@@ -22,10 +23,27 @@ public class Customer {
 
     @Id
     private String id;
+
+    /**
+     * The subject of the caller's Keycloak access token.
+     *
+     * <p>This is what binds a business record to an authenticated identity. Previously
+     * nothing linked the two, so any authenticated user could read every customer
+     * record and place orders against any customer id.
+     *
+     * <p>The index is sparse so pre-existing documents without this field do not
+     * collide, while uniqueness is still enforced for every new record.
+     */
+    @Indexed(unique = true, sparse = true)
+    private String keycloakId;
+
     private String firstname;
     private String lastname;
+
+    @Indexed
     @Email (message = "The email is not correctlly formated !")
     @NotNull (message = "The email is required!")
     private String email;
+
     private Address address;
 }
