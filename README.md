@@ -240,8 +240,9 @@ Docker network cannot skip authorization.
 <details>
 <summary><b>📡 How order calls the other services</b></summary>
 
-`order` calls `customer`, `product` and `payment` **directly through Eureka**
-(`lb://product-service`, …) with `RestTemplate` — *not* through the gateway, and *not* with Feign.
+`order` calls `customer` and `payment` via **OpenFeign clients** (`@FeignClient(name="...")`) and
+`product` via a **load-balanced `RestTemplate`** (`lb://product-service`). All internal calls go
+directly to services through Eureka — never through the API gateway.
 
 - Each call copies the inbound `Authorization` header onto the outbound request, so the
   downstream service authorizes the **real end user** rather than a shared service identity.
