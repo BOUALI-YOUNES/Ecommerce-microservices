@@ -193,45 +193,21 @@ types in separate processes, not a shared class.
 classDiagram
     direction LR
 
-    class OrderService {
-        -CustomerClient customerClient
-        -ProductClient productClient
-        -PaymentClient paymentClient
-        -OrderCompensation compensation
-        -OrderProducer orderProducer
-        +createOrder(req, customerId)
-        -resolveCustomer()
-    }
+    class OrderService
+    class OrderCompensation
+    class ProductClient
+    class CustomerClient
+    class PaymentClient
+    class OrderProducer
+    class OrderRepo
 
-    class OrderCompensation {
-        -ProductClient productClient
-        -release(lines)
-    }
-
-    class ProductClient {
-        +purchaseProduct(request)
-        +releaseStock(request)
-    }
-
-    class OrderStatus {
-        <<enumeration>>
-        PENDING
-        PAID
-        FAILED
-        CANCELLED
-    }
-
-    class PaymentMethod {
-        <<enumeration>>
-        PAYPAL
-        MASTER_CARD
-        VISA
-        BITCOIN
-    }
-
-    OrderService ..> OrderCompensation : on rollback
-    OrderCompensation ..> ProductClient : releases via
-    OrderService ..> ProductClient : reserves via
+    OrderService ..> OrderCompensation : rollback
+    OrderCompensation ..> ProductClient : release
+    OrderService ..> ProductClient : purchase
+    OrderService ..> CustomerClient : findMe
+    OrderService ..> PaymentClient : pay
+    OrderService ..> OrderProducer : publish
+    OrderService ..> OrderRepo : save
 ```
 
 <details>
