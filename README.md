@@ -189,25 +189,36 @@ types in separate processes, not a shared class.
 ### 🧱 Class diagram
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontSize":"16px"}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontSize":"13px"},"flowchart":{"nodeSpacing":4,"rankSpacing":40,"padding":4}}}%%
 classDiagram
     direction LR
 
-    class OrderService
-    class OrderCompensation
-    class ProductClient
-    class CustomerClient
-    class PaymentClient
-    class OrderProducer
-    class OrderRepo
+    class Category { -Integer id -String name }
+    class Product { -Integer id -String name -double availableQuantity -BigDecimal price }
+    Category "1" *-- "0..*" Product
 
-    OrderService ..> OrderCompensation : rollback
-    OrderCompensation ..> ProductClient : release
-    OrderService ..> ProductClient : purchase
-    OrderService ..> CustomerClient : findMe
-    OrderService ..> PaymentClient : pay
-    OrderService ..> OrderProducer : publish
-    OrderService ..> OrderRepo : save
+    class Order { -Integer id -String reference -BigDecimal totalAmount -String customerId }
+    class OrderLine { -Integer id -Integer productId -double quantity }
+    class OrderStatus { <<enumeration>> PENDING PAID FAILED CANCELLED }
+    class PaymentMethod { <<enumeration>> PAYPAL MASTER_CARD VISA BITCOIN }
+    Order "1" *-- "0..*" OrderLine
+    Order --> OrderStatus
+    Order --> PaymentMethod
+
+    class Customer { -String id -String keycloakId -String email }
+    class Address { -String street -String houseNumber -String zipCode }
+    Customer --> Address
+
+    class Payment { -Integer id -BigDecimal amount -Integer orderId }
+    Payment --> PaymentMethod
+
+    class Notification { -String id -NotificationType type }
+    class NotificationType { <<enumeration>> PAYMENT_CONFIRMATION ORDER_CONFIRMATION }
+    class OrderConfirmation { -String orderRef -BigDecimal total }
+    class PaymentConfirmation { -String productRef -BigDecimal amount }
+    Notification --> NotificationType
+    Notification --> OrderConfirmation
+    Notification --> PaymentConfirmation
 ```
 
 <details>
