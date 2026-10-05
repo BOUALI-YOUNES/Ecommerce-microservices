@@ -25,6 +25,11 @@ import org.springframework.web.client.RestTemplate;
  *
  * <p>@LoadBalanced lets the call resolve through Eureka, and the interceptor forwards
  * the caller's bearer token so the product service can authenticate the caller.
+ *
+ * <p>Two instances exist because the product service now treats the stock release
+ * endpoint as internal: it accepts only the order service's own account, not a
+ * shopper's token. Forwarding the caller's token on that call would be rejected, and
+ * attempting the release as the shopper would defeat the restriction.
  */
 @Configuration
 public class RestTemplateConfig {
@@ -35,19 +40,42 @@ public class RestTemplateConfig {
     @Value("${application.config.read-timeout:10s}")
     private Duration readTimeout;
 
-    @Bean
+    /**
+     * Used for calls that act on behalf of the end user, such as reserving stock for
+     * their order. The product service authorizes those as the shopper.
+     */
+    @Bean("userRestTemplate")
     @LoadBalanced
-    public RestTemplate restTemplate(RestTemplateBuilder builder) {
+    public RestTemplate userRestTemplate(RestTemplateBuilder builder) {
+        return builder
+                .requestFactory(() -> requestFactory())
+                .additionalInterceptors(bearerTokenInterceptor())
+                .build();
+    }
+
+    /**
+     * Used for calls the order service makes as itself, such as releasing stock after a
+     * rollback. The caller's token is deliberately not forwarded here: the product
+     * service restricts the release endpoint to this service's own account, so
+     * relaying a shopper's token would be rejected anyway.
+     */
+    @Bean("serviceRestTemplate")
+    @LoadBalanced
+    public RestTemplate serviceRestTemplate(RestTemplateBuilder builder, ServiceTokenProvider tokenProvider) {
+        return builder
+                .requestFactory(() -> requestFactory())
+                .additionalInterceptors((request, body, execution) -> {
+                    request.getHeaders().setBearerAuth(tokenProvider.getToken());
+                    return execution.execute(request, body);
+                })
+                .build();
+    }
+
+    private ClientHttpRequestFactory requestFactory() {
         var settings = HttpClientSettings.defaults().withTimeouts(connectTimeout, readTimeout);
         // Boot 4 accepts either a factory Class or a Supplier here; there is no
         // overload taking a pre-built factory instance, so it is passed as a Supplier.
-        ClientHttpRequestFactory requestFactory =
-                ClientHttpRequestFactoryBuilder.detect().build(settings);
-
-        return builder
-                .requestFactory(() -> requestFactory)
-                .additionalInterceptors(bearerTokenInterceptor())
-                .build();
+        return ClientHttpRequestFactoryBuilder.detect().build(settings);
     }
 
     private ClientHttpRequestInterceptor bearerTokenInterceptor() {

@@ -304,6 +304,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=postgres
       - KAFKA_BOOTSTRAP=kafka:29092
+      # Used only for the internal stock-release callback, which the product service
+      # restricts to this service account instead of accepting any user token.
+      - ORDER_SERVICE_CLIENT_ID=${ORDER_SERVICE_CLIENT_ID}
+      - ORDER_SERVICE_CLIENT_SECRET=${ORDER_SERVICE_CLIENT_SECRET}
     depends_on:
       config-server:
         condition: service_healthy
@@ -400,6 +404,13 @@ services:
       # Left alone it sizes itself against the whole Docker VM, and start-dev is the
       # heaviest single process in the stack.
       - JAVA_OPTS=-Xms64m -Xmx320m -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError
+      # Pins the hostname Keycloak puts in the iss claim, so a token is identical
+      # whether it was minted from the host (localhost:9098) or from another container
+      # (keycloak:8080). Without this the service-to-service token was issued with
+      # iss=http://keycloak:8080/... and every resource server, which validates the
+      # external issuer, answered 401.
+      - KC_HOSTNAME=localhost
+      - KC_HOSTNAME_PORT=9098
     networks:
       - ms-net
     volumes:
@@ -418,6 +429,11 @@ services:
     # everybody would forget; a real deployment should use a properly owned image or
     # point KC_DB at a database server.
     user: root
+    # Pins the hostname Keycloak puts in the iss claim, so a token is identical whether
+    # it was minted from the host (localhost:9098) or from another container
+    # (keycloak:8080). Without this the service-to-service token was issued with
+    # iss=http://keycloak:8080/... and every resource server, which validates the
+    # external issuer, answered 401.
     command: 
       - "start-dev"
       - "--import-realm"

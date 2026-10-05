@@ -14,6 +14,7 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-7-47a248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Zipkin](https://img.shields.io/badge/Zipkin-3-5cb3c8?style=flat-square&logo=zipkin&logoColor=white)](https://zipkin.io/)
 [![Maven](https://img.shields.io/badge/Maven-3.8.7-blue?style=flat-square&logo=apachemaven&logoColor=white)](https://maven.apache.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 **8 services** · **JWT validated in every service** · **17 containers, all memory-capped**
 
@@ -412,9 +413,49 @@ call took a product from 4 to 54 units in testing.
 
 It returns `403` for `USER`, `403` for `ADMIN` and `401` anonymously. Service-to-service calls
 bypass the gateway, so order placement is unaffected.
+</details>
 
-Restricting it *properly* needs a service identity (client credentials with its own scope)
-rather than the end user's relayed token — see the *Known issues* section at the end of this file.
+<details>
+<summary><b>🔐 The release endpoint is also closed at the service that owns it</b></summary>
+
+Denying the route at the gateway was not enough. All services share one Docker network, and the
+product service accepted **any** valid token, so an ordinary `USER` token replayed straight at
+`http://product-service:8050` could still inflate stock. Measured before the fix: a product went
+from **47 to 824 units** in one call.
+
+The product service now requires realm role `SERVICE` on that route:
+
+```java
+.requestMatchers(HttpMethod.POST, "/api/v1/products/purchase/release").hasRole("SERVICE")
+```
+
+That role is held only by a Keycloak **service account** (`ecom-order-service`, a confidential
+client with no interactive login), never by a human user. `ADMIN` does not grant it on purpose,
+so a compromised admin token cannot inflate stock either.
+
+The order service presents that identity instead of the shopper's token. It keeps two
+`RestTemplate` beans, because the two calls need different identities:
+
+| Bean | Token sent | Used for |
+|---|---|---|
+| `userRestTemplate` | the caller's JWT | reserving stock for an order |
+| `serviceRestTemplate` | the order service's own token | releasing stock after a rollback |
+
+`ServiceTokenProvider` fetches the token with `client_credentials` and caches it until shortly
+before it expires, so a rollback does not call Keycloak on every attempt.
+
+Verified against the running stack:
+
+| Attempt | Result |
+|---|:---:|
+| `USER` token → product port, release | ✅ `403`, stock unchanged |
+| `ADMIN` token → product port, release | ✅ `403`, stock unchanged |
+| Anonymous → product port, release | ✅ `401`, stock unchanged |
+| Service token → product port, release | ✅ `204`, stock released |
+| Normal order (shopper token) | ✅ `200`, stock decremented |
+| Failed order → compensation | ✅ stock fully restored |
+| Gateway → release | ✅ `403` |
+
 </details>
 
 ### Inside the services
@@ -442,6 +483,17 @@ keycloak.issuer-uri: http://localhost:9098/realms/ecom-realm
 This needs an explicit `JwtDecoder` bean; `Customizer.withDefaults()` cannot express the split.
 Realm roles from `realm_access.roles` are mapped to `ROLE_*` authorities by a
 `JwtAuthenticationConverter` that each service declares itself.
+
+Pinning the issuer is what makes the split safe. Keycloak otherwise puts whatever host the
+request arrived on into `iss`, so a token minted from inside the network was issued with
+`iss=http://keycloak:8080/...` and every resource server answered `401`:
+
+```yaml
+KC_HOSTNAME=localhost
+KC_HOSTNAME_PORT=9098
+```
+
+Both `localhost:9098` and `keycloak:8080` now yield `iss=http://localhost:9098/realms/ecom-realm`.
 </details>
 
 ---
@@ -456,6 +508,7 @@ Copy `.env.example` to `.env` and set the values. `.env` is gitignored.
 | `MONGO_USER` / `MONGO_PASSWORD` | MongoDB for customer, notification |
 | `MAIL_USER` / `MAIL_PASSWORD` | SMTP (left empty for MailDev) |
 | `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` | Keycloak bootstrap admin |
+| `ORDER_SERVICE_CLIENT_ID` / `ORDER_SERVICE_CLIENT_SECRET` | Order service's service account, used only for the internal stock release |
 
 Configuration lives in `services/config-server/src/main/resources/configurations/`, keyed by
 application name. There is **no aggregator POM** — build each service from its own directory.
@@ -629,11 +682,13 @@ step.
 </details>
 
 <details>
-<summary><b>🌐 The release endpoint is still reachable inside the network</b></summary>
+<summary><b>🌐 A compromised container still holds a valid service token</b></summary>
 
-The gateway denies it, but all services share one Docker network, so a compromised container
-could still call it. Closing this properly needs a service identity rather than the relayed
-end-user token.
+The release endpoint is now closed to end users at the product service itself, using a service
+account rather than the relayed token. What remains: any container on the Docker network that
+steals the order service's client secret could still release stock. Narrowing that further means
+mTLS or per-caller identities between services, or moving compensation onto an internal-only
+network with no shared credentials.
 </details>
 
 <details>
@@ -651,6 +706,12 @@ A `400` with validation errors from `POST /api/v1/products`, or a `404` for a mi
 means the request reached the service — the code comes from bean validation or a missing mapping,
 not from the gateway. Check the service logs.
 </details>
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 

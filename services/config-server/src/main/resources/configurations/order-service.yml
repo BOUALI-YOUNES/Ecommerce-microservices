@@ -50,6 +50,15 @@ server:
     port: 8070
 keycloak:
     issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9098/realms/ecom-realm}
+order:
+    service:
+        # The order service's own identity, used for the internal stock release.
+        # The product service accepts that route only for realm role SERVICE, so a
+        # shopper's token cannot be used to inflate stock by calling the product
+        # port directly. The secret matches keycloak/realm-export.json.
+        token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak:8080/realms/ecom-realm/protocol/openid-connect/token}
+        client-id: ${ORDER_SERVICE_CLIENT_ID:ecom-order-service}
+        client-secret: ${ORDER_SERVICE_CLIENT_SECRET}
 application:
     config:
         # Budgets for the service-to-service call. The previous RestTemplate had no

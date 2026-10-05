@@ -24,6 +24,10 @@
         "composite": false,
         "clientRole": false,
         "containerId": "ecom-realm"
+      },
+      {
+        "name": "SERVICE",
+        "description": "Service-to-service identity used for internal callbacks such as stock release. Never assignable to end users."
       }
     ]
   },
@@ -45,6 +49,29 @@
       "webOrigins": [
         "*"
       ]
+    },
+    {
+      "clientId": "ecom-order-service",
+      "name": "Order Service (service-to-service)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "order-service-dev-secret",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
     }
   ],
   "users": [
@@ -83,6 +110,14 @@
       "realmRoles": [
         "USER",
         "ADMIN"
+      ]
+    },
+    {
+      "username": "service-account-ecom-order-service",
+      "enabled": true,
+      "serviceAccountClientId": "ecom-order-service",
+      "realmRoles": [
+        "SERVICE"
       ]
     }
   ]
