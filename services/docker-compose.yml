@@ -411,6 +411,11 @@ services:
       # external issuer, answered 401.
       - KC_HOSTNAME=localhost
       - KC_HOSTNAME_PORT=9098
+      # Substituted into the "${ORDER_SERVICE_CLIENT_SECRET}" placeholder in the realm
+      # import below. Required rather than optional on purpose: if it were allowed to be
+      # unset, Keycloak would import the client with the literal placeholder text as its
+      # secret, which is public in the repository and therefore guessable.
+      - ORDER_SERVICE_CLIENT_SECRET=${ORDER_SERVICE_CLIENT_SECRET:?set ORDER_SERVICE_CLIENT_SECRET in services/.env first}
     networks:
       - ms-net
     volumes:
